@@ -76,7 +76,7 @@ $app->post('/login', function (Request $request, Response $response)use ($key) {
     $data = $request->getParsedBody();
     var_dump($data);
     require 'db.php';
-    $query = 'SELECT `email`,`id`,`password`,`lastname`,`firstname` FROM `users` WHERE `email` = ?';
+    $query = 'SELECT `id` FROM `users` WHERE `email` = ?';
     $queryexec = $database->prepare($query);
     $queryexec->bindValue(1, $data['email'] ,PDO::PARAM_STR);
     $queryexec->execute();
