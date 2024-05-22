@@ -59,7 +59,7 @@ $app->post('/addUser', function (Request $request, Response $response) {
         $queryexec->bindValue(4, $passwordhash ,PDO::PARAM_STR);
         $queryexec->execute();
 
-        $response->getBody()->write(json_encode(['valid' => 'Super le compte est créé']));
+        $response->getBody()->write(json_encode(['valid' => 'ok']));
         return $response->withHeader('Content-Type', 'application/json')->withStatus(201);
 
 
@@ -74,14 +74,12 @@ $app->post('/addUser', function (Request $request, Response $response) {
 
 $app->post('/login', function (Request $request, Response $response)use ($key) {
     $data = $request->getParsedBody();
-    var_dump($data);
     require 'db.php';
-    $query = 'SELECT `id` FROM `users` WHERE `email` = ?';
+    $query = 'SELECT `id`,`password` FROM `users` WHERE `email` = ?';
     $queryexec = $database->prepare($query);
     $queryexec->bindValue(1, $data['email'] ,PDO::PARAM_STR);
     $queryexec->execute();
     $res = $queryexec->fetchAll();
-
     if(password_verify($data['password'],$res[0]['password'])){
 
         $payload = [
@@ -108,8 +106,7 @@ $app->get('/profil', function (Request $request, Response $response) {
     $queryexec->bindValue(1, $id ,PDO::PARAM_INT);
     $queryexec->execute();
     $res = $queryexec->fetchAll();
-    var_dump($res);
-    $response->getBody()->write(json_encode(['profif valid' => 'ok']));
+    $response->getBody()->write(json_encode(['profil valid' => 'ok', 'data' => $res]));
     return $response->withHeader('Content-Type', 'application/json')->withStatus(201);
 })->add($authMiddleware);
 
