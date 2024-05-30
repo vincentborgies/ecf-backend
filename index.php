@@ -28,6 +28,15 @@ $authMiddleware = function($request,$handler)use ($key){
         }
 };
 
+$app->add(function ($request, $handler) {
+    $response = $handler->handle($request);
+    return $response
+        ->withHeader('Access-Control-Allow-Origin', '*')
+        ->withHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Accept, Origin, Authorization')
+        ->withHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+});
+
+
 
 $app->post('/addUser', function (Request $request, Response $response) {
     $err = array();
@@ -80,6 +89,10 @@ $app->post('/login', function (Request $request, Response $response)use ($key) {
     $queryexec->bindValue(1, $data['email'] ,PDO::PARAM_STR);
     $queryexec->execute();
     $res = $queryexec->fetchAll();
+    if(empty($res)){
+        $response->getBody()->write(json_encode(['erreur' => 'utilisateur non trouvé']));
+        return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
+    }
     if(password_verify($data['password'],$res[0]['password'])){
 
         $payload = [
@@ -109,5 +122,116 @@ $app->get('/profil', function (Request $request, Response $response) {
     $response->getBody()->write(json_encode(['profil valid' => 'ok', 'data' => $res]));
     return $response->withHeader('Content-Type', 'application/json')->withStatus(201);
 })->add($authMiddleware);
+
+$app->put('/updateProfil/{id}', function (Request $request, Response $response, array $args) {
+    require 'db.php'; 
+
+    $id = $args['id'];
+    $data = $request->getParsedBody();
+
+    $fields = [];
+    $values = [];
+    
+    if (isset($data['email'])) {
+        $fields[] = '`email` = ?';
+        $values[] = $data['email'];
+    }
+    if (isset($data['lastname'])) {
+        $fields[] = '`lastname` = ?';
+        $values[] = $data['lastname'];
+    }
+    if (isset($data['firstname'])) {
+        $fields[] = '`firstname` = ?';
+        $values[] = $data['firstname'];
+    }
+    
+    if (!empty($fields)) {
+        $query = 'UPDATE `users` SET ' . implode(', ', $fields) . ' WHERE `id` = ?';
+        $values[] = $id; 
+        $queryexec = $database->prepare($query);
+        
+        foreach ($values as $index => $value) {
+            $queryexec->bindValue($index + 1, $value);
+        }
+        
+        $queryexec->execute();
+    
+        if ($queryexec->rowCount() > 0) {
+            $response->getBody()->write(json_encode(['valid' => 'le profil a été mis à jour']));
+            return $response->withHeader('Content-Type', 'application/json')->withStatus(200);
+        } else {
+            $response->getBody()->write(json_encode(['message' => 'aucun changement ou echec de la mise à jour']));
+            return $response->withHeader('Content-Type', 'application/json')->withStatus(304);
+        }
+    } else {
+        // Aucun champ à mettre à jour
+        $response->getBody()->write(json_encode(['message' => 'aucune donnée fournie pour la mise à jour']));
+        return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
+    }
+})->add($authMiddleware);
+
+
+
+$app->post('/addTraining', function (Request $request, Response $response) {
+    require 'db.php';
+    $data = $request->getParsedBody();
+    $sql = "INSERT INTO trainings (date, activity_name, time, comment) VALUES (:date, :activity_name, :time, :comment)";
+    $stmt = $database->prepare($sql);
+    $stmt->execute([
+        'date' => $data['date'],
+        'activity_name' => $data['activity_name'],
+        'time' => $data['time'],
+        'comment' => $data['comment']
+    ]);
+    $response->getBody()->write(json_encode(['valid' => 'le training a été ajouté avec succès']));
+    return $response->withHeader('Content-Type', 'application/json')->withStatus(201);
+})->add($authMiddleware);
+
+$app->delete('/trainings/{id}', function (Request $request, Response $response, array $args) {
+    require 'db.php';
+    $sql = "DELETE FROM trainings WHERE id = :id";
+    $stmt = $database->prepare($sql);
+    $stmt->execute(['id' => $args['id']]);
+    $response->getBody()->write(json_encode(['valid' => 'le training a été supprimé avec succès']));
+    return $response->withHeader('Content-Type', 'application/json')->withStatus(201);
+})->add($authMiddleware);
+
+$app->put('/trainings/{id}', function (Request $request, Response $response, array $args) {
+    require 'db.php';
+    $data = $request->getParsedBody();
+    $sql = "UPDATE trainings SET date = :date, activity_name = :activity_name, time = :time, comment = :comment WHERE id = :id";
+    $stmt = $database->prepare($sql);
+
+  
+    $params = [
+        ':id' => $args['id'],
+        ':date' => $data['date'] ?? null,
+        ':activity_name' => $data['activity_name'] ?? null,
+        ':time' => $data['time'] ?? null,
+        ':comment' => $data['comment'] ?? null
+    ];
+
+    $stmt->execute($params);
+    $response->getBody()->write(json_encode(['valid' => 'Le training a été modifié avec succès']));
+    return $response->withHeader('Content-Type', 'application/json')->withStatus(200);
+})->add($authMiddleware);
+
+
+$app->get('/getTrainings', function (Request $request, Response $response) {
+    require 'db.php';
+    $sql = "SELECT * FROM trainings";
+    $stmt = $database->query($sql);
+    $trainings = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+
+    if(empty($trainings)){
+        $response->getBody()->write(json_encode(['erreur' => 'aucun training trouvé']));
+        return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
+    }
+    $response->getBody()->write(json_encode(['data' => $trainings]));
+    return $response->withHeader('Content-Type', 'application/json')->withStatus(200);
+})->add($authMiddleware);
+
+
 
 $app->run();
